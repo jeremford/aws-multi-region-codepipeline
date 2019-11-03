@@ -1,0 +1,9 @@
+{
+  "Parameters" : {
+    "TemplatePath": "TEMPLATE_PATH_PLACEHOLDER",
+    "Environment": "prod",
+    "ReplicantBucket": "OVERRIDETHIS",
+    "CidrPrefix": "10.130",
+    "PrimaryRegion": "ap-southeast-2"
+  }
+}

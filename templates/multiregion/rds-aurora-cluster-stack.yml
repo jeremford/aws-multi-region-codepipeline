@@ -1,0 +1,212 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS Aurora Cluster
+Outputs:
+  ClusterIdentifier:
+    Description: DB instance identifier
+    Value: !Ref DatabaseCluster
+
+  DBSubnetGroup:
+    Description: DBSubnetGroup
+    Value: !Ref DBSubnetGroup
+
+Parameters:
+  VpcId:
+    Description: VPC ID to deploy into
+    Type: AWS::EC2::VPC::Id
+  Owner:
+    Description: Owner of product
+    Type: String
+    Default: "GARNCC"
+  Product:
+    Description: Name of owning product
+    Type: String
+    Default: "DEMO"
+  Environment:
+    Description: Name of Environment
+    Type: String
+    Default: "dev"
+  KmsKeyId:
+    Description: KMS Key ID ARN to use
+    Type: String
+  PrimaryRegion:
+    Type: String
+    Description: Primary Region for Cluster
+  DBSubnets:
+    Type: "List<AWS::EC2::Subnet::Id>"
+    Description: Subnet Ids for the DB
+  DBName:
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
+    ConstraintDescription: must begin with a letter and contain only alphanumeric (max 64 characters)
+      characters.
+    Description: MySQL database
+    MaxLength: '64'
+    MinLength: '1'
+    Type: String
+  DBPassword:
+    AllowedPattern: '[a-zA-Z0-9]*'
+    ConstraintDescription: must contain only alphanumeric characters (max 41 characters)
+    Description: The database admin account password
+    MaxLength: '41'
+    MinLength: '1'
+    NoEcho: 'true'
+    Type: String
+  DBUsername:
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
+    ConstraintDescription: must begin with a letter and contain only alphanumeric (max 16 characters)
+      characters.
+    Description: The database admin account username
+    MaxLength: '16'
+    MinLength: '1'
+    NoEcho: 'true'
+    Type: String
+  DBEngine:
+    Description: Database engine version
+    Type: String
+    Default: "5.7.12"
+  DBPort:
+    Description: Database access port
+    Type: String
+    Default: "3306"
+  DBSnapshotName:
+    Description: The name of a DB snapshot (optional)
+    Default: ""
+    Type: String
+  DBBackupRetentionPeriod:
+    Description: Number of days to store the automated snapshots. Must be between 0 and 35.
+    Type: String
+    Default: "20"
+  DBPreferredBackupWindow:
+    Description: Preferred time window for RDS backup snapshots to be taken.
+    Type: String
+    Default: "16:00-16:30"
+  DBPreferredMaintenanceWindow:
+    Description: Preferred time window for RDS maintenance to take place.
+    Type: String
+    Default: "sat:17:00-sat:17:30"
+  ReplicationSourceIdentifier:
+    Description: ReplicationSourceIdentifier for replicating Aurora Cluster
+    Type: String
+    Default: ""
+
+######################################
+#           Conditions               #
+######################################
+Conditions:
+  UseDBSnapshot: !Not [!Equals [!Ref DBSnapshotName, ""]]
+  UseSourceReplicaCluster: !Not [!Equals [!Ref ReplicationSourceIdentifier, ""]]
+
+Resources:
+
+  DatabaseCluster:
+    Type: AWS::RDS::DBCluster
+    DeletionPolicy: Snapshot
+    Properties:
+      DBClusterIdentifier: !Ref DBName  #IMPORTANT: DO NOT CHANGE THIS ONCE THE DB HAS BEEN CREATED!!!
+      DBClusterParameterGroupName: !Ref DatabaseClusterParameterGroup
+      SnapshotIdentifier: !If [UseDBSnapshot, !Ref DBSnapshotName, !Ref "AWS::NoValue"]
+      BackupRetentionPeriod: !Ref DBBackupRetentionPeriod
+      DatabaseName: !If [UseSourceReplicaCluster, !Ref "AWS::NoValue", !Ref DBName]
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      Engine: aurora-mysql
+      EngineVersion: !Ref DBEngine
+      MasterUserPassword: !If [UseSourceReplicaCluster, !Ref "AWS::NoValue", !Ref DBPassword] #TODO use this "{{resolve:ssm-secure:demoRDSPwd:1}}"
+      MasterUsername: !If [UseSourceReplicaCluster, !Ref "AWS::NoValue", !Ref DBUsername]
+      Port: !Ref DBPort
+      PreferredBackupWindow: !Ref DBPreferredBackupWindow
+      PreferredMaintenanceWindow: !Ref DBPreferredMaintenanceWindow
+      VpcSecurityGroupIds:
+        - Ref: RdsSecurityGroup
+      StorageEncrypted: true
+      ReplicationSourceIdentifier: !If [UseSourceReplicaCluster, !Ref ReplicationSourceIdentifier, !Ref "AWS::NoValue"]
+      SourceRegion: !If [UseSourceReplicaCluster, !Ref PrimaryRegion, !Ref "AWS::NoValue"]
+      KmsKeyId: !Ref KmsKeyId
+
+  DatabaseClusterParameterGroup:
+    Type: "AWS::RDS::DBClusterParameterGroup"
+    Properties:
+      Parameters:
+        character_set_database: "utf8"
+        binlog_format: "MIXED"
+      Family: "aurora-mysql5.7"
+      Description: "Aurora aurora-mysql5.7 DBClusterParameterGroup"
+
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnets available for the RDS DB Instance
+      SubnetIds: !Ref DBSubnets
+
+###### Security Group Configuration ######
+  RdsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for RDS DB Instance.
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: !Ref DBPort
+        ToPort: !Ref DBPort
+        SourceSecurityGroupId:
+          Fn::GetAtt:
+          - ConsumerSecurityGroup
+          - GroupId
+
+  ConsumerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for services that need to connect to RDS DB Instance.
+      VpcId: !Ref VpcId
+
+  OutboundRule:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      IpProtocol: tcp
+      FromPort: !Ref DBPort
+      ToPort: !Ref DBPort
+      DestinationSecurityGroupId:
+        Fn::GetAtt:
+        - RdsSecurityGroup
+        - GroupId
+      GroupId:
+        Fn::GetAtt:
+        - ConsumerSecurityGroup
+        - GroupId
+
+
+  # # First Aurora Instance
+  # DatabaseA:
+  #   Type: AWS::RDS::DBInstance
+  #   Properties:
+  #     DBClusterIdentifier: !Ref DatabaseCluster #IMPORTANT: DO NOT CHANGE THIS ONCE THE DB HAS BEEN CREATED!!!
+  #     DBInstanceIdentifier: !Sub "${DBName}-a"  #IMPORTANT: DO NOT CHANGE THIS ONCE THE DB HAS BEEN CREATED!!!
+  #     AvailabilityZone: !GetAtt [DataSubnetA, "AvailabilityZone"]
+  #     DBInstanceClass: !Ref DBClass
+  #     DBParameterGroupName: !Ref DatabaseParamGroup
+  #     DBSubnetGroupName: !Ref DBSubnetGroup
+  #     Engine: aurora-mysql
+  #     EngineVersion: !Ref DBEngine
+  #     PubliclyAccessible: false
+  #
+  # # Second Aurora Instance only if MultiAZ
+  # DatabaseB:
+  #   Type: AWS::RDS::DBInstance
+  #   Condition: Create2ndSubnet
+  #   Properties:
+  #     DBClusterIdentifier: !Ref DatabaseCluster #IMPORTANT: DO NOT CHANGE THIS ONCE THE DB HAS BEEN CREATED!!!
+  #     DBInstanceIdentifier: !Sub "${DBName}-b"   #IMPORTANT: DO NOT CHANGE THIS ONCE THE DB HAS BEEN CREATED!!!
+  #     AvailabilityZone: !GetAtt [DataSubnetB, "AvailabilityZone"]
+  #     DBInstanceClass: !Ref DBClass
+  #     DBParameterGroupName: !Ref DatabaseParamGroup
+  #     DBSubnetGroupName: !Ref DBSubnetGroup
+  #     Engine: aurora-mysql
+  #     EngineVersion: !Ref DBEngine
+  #     PubliclyAccessible: false
+  #
+  # DatabaseParamGroup:
+  #   Type: "AWS::RDS::DBParameterGroup"
+  #   Properties:
+  #     Family: aurora-mysql5.7
+  #     Description: CloudFormation Sample Database Parameter Group
+  #     Parameters:
+  #       autocommit: 0
+  #       general_log: 1

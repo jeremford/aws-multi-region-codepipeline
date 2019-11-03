@@ -1,0 +1,48 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 8
+    commands:
+      npm install jsonlint -g
+  pre_build:
+    commands:
+      - echo "Validating CFN templates"
+      - |
+        for cfn_template in $(find . -type f \( -iname "*.yml" ! -iname "buildspec.yml" \)); do
+          echo "Validating CloudFormation template file $cfn_template"
+          aws cloudformation validate-template --template-body file://$cfn_template
+        done
+      - |
+        for conf in $(find . -name "config*.json"); do
+          echo "Validating CFN parameters config file $conf"
+          jsonlint -q $conf
+        done
+  build:
+    commands:
+      - echo "Copying child stack templates to S3"
+      - |
+        for child_template in $(find . -type f \( -iname "*.yml" ! -iname "master-stack.yml" ! -iname "buildspec.yml" \) | cut -c3- ); do
+          if [ "X$TEMPLATE_PREFIX" = "X" ]; then
+            aws s3 cp "$child_template" "s3://$TEMPLATE_BUCKET/$child_template"
+          else
+            aws s3 cp "$child_template" "s3://$TEMPLATE_BUCKET/$TEMPLATE_PREFIX/$child_template"
+          fi
+        done
+      - echo "Updating template configuration files to use the appropriate values"
+      - |
+        for conf in $(find . -name "config*.json"); do
+          if [ "X$TEMPLATE_PREFIX" = "X" ]; then
+            echo "Replacing \"TEMPLATE_PATH_PLACEHOLDER\" for \"$TEMPLATE_BUCKET\" in $conf"
+            sed -i -e "s/TEMPLATE_PATH_PLACEHOLDER/$TEMPLATE_BUCKET/" $conf
+          else
+            echo "Replacing \"TEMPLATE_PATH_PLACEHOLDER\" for \"$TEMPLATE_BUCKET/$TEMPLATE_PREFIX\" in $conf"
+            sed -i -e "s/TEMPLATE_PATH_PLACEHOLDER/$TEMPLATE_BUCKET\/$TEMPLATE_PREFIX/" $conf
+          fi
+        done
+artifacts:
+  files:
+    - master-stack.yml
+    - config-*.json
+

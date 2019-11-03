@@ -1,0 +1,84 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: S3 bucket for Artifact storage
+Outputs:
+  S3BucketId:
+    Description: Owner S3 Bucket ID
+    Value:
+      Ref: Bucket
+
+Parameters:
+  BucketName:
+    Description: Name of the S3 bucket.
+    Type: String
+  ReplicantBucket:
+    Type: String
+    Description: S3Bucket to use as a Replicant
+
+Conditions:
+  UseGeneratedBucketName: !Equals [!Ref BucketName, ""]
+
+Resources:
+
+  Bucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !If [UseGeneratedBucketName, !Ref "AWS::NoValue", !Ref BucketName]
+      VersioningConfiguration:
+         Status: 'Enabled'
+      ReplicationConfiguration:
+        Role: !GetAtt [SourceBucketBackupRole, Arn]
+        Rules:
+        - Destination:
+            Bucket: !Sub "arn:aws:s3:::${ReplicantBucket}"
+            StorageClass: STANDARD
+          Id: Backup
+          Prefix: ''
+          Status: Enabled
+
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: AllPreviousVersionsToGlacier
+            Status: Enabled
+            NoncurrentVersionTransitions:
+              - TransitionInDays: 30
+                StorageClass: GLACIER
+
+  SourceBucketBackupRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action: ['sts:AssumeRole']
+          Effect: Allow
+          Principal:
+            Service: [s3.amazonaws.com]
+
+  BucketBackupPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+        - Action: ['s3:GetReplicationConfiguration', 's3:ListBucket']
+          Effect: Allow
+          Resource:
+          - !Sub "arn:aws:s3:::${Bucket}"
+        - Action: ['s3:GetObjectVersion', 's3:GetObjectVersionAcl']
+          Effect: Allow
+          Resource:
+          - !Sub "arn:aws:s3:::${Bucket}/*"
+        - Action: ['s3:ReplicateObject', 's3:ReplicateDelete']
+          Effect: Allow
+          Resource:
+          - !Sub "arn:aws:s3:::${ReplicantBucket}/*"
+      PolicyName: BucketBackupPolicy
+      Roles: [!Ref 'SourceBucketBackupRole']

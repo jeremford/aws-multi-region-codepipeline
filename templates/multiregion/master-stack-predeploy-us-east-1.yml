@@ -1,0 +1,22 @@
+Description: Master stack which creates all required nested stacks
+
+Parameters:
+  TemplatePath:
+    Type: String
+    Description: S3Bucket Path where the templates are stored
+
+Resources:
+
+  ReplicantS3Stack:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL:
+        Fn::Sub: "https://s3.amazonaws.com/${TemplatePath}/s3-replicant-stack.yml"
+      Parameters:
+        BucketName: ""
+
+Outputs:
+  ReplicantS3Bucket:
+    Description: "S3 Bucket Name to use as Target for Cross Region Replication"
+    Value:
+      Fn::GetAtt: ReplicantS3Stack.Outputs.S3BucketId

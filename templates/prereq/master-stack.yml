@@ -1,0 +1,22 @@
+Description: Master stack which creates all required nested stacks
+
+Parameters:
+  TemplatePath:
+    Type: String
+    Description: S3Bucket Path where the templates are stored
+
+Resources:
+
+  MultiRegionPipelineArtifactsS3Stack:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL:
+        Fn::Sub: "https://s3.amazonaws.com/${TemplatePath}/pipeline-artifacts-s3-stack.yml"
+      Parameters:
+        BucketName: ""
+
+Outputs:
+  MultiRegionPipelineArtifactsS3BucketName:
+    Description: "MultiRegionPipelineArtifactsS3 Bucket Name"
+    Value:
+      Fn::GetAtt: MultiRegionPipelineArtifactsS3Stack.Outputs.S3BucketId

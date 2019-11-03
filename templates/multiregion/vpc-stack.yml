@@ -1,0 +1,863 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Three Tier VPC Network following AWS Best Practices
+
+######################################
+#           Outputs                  #
+######################################
+Outputs:
+  VPCID:
+    Description: Product VPC ID value
+    Value: !Ref VPC
+    Export:
+      Name:
+        Fn::Join:
+        - ''
+        - - Ref: Product
+          - Ref: Environment
+          - VPC
+  VPCCIDR:
+    Description: Product VPC CIDR value
+    Value:
+      Fn::Join:
+        - '.'
+        - - Ref: CidrPrefix
+          - 0.0/16
+    Export:
+      Name:
+        Fn::Join:
+        - ''
+        - - Ref: Product
+          - Ref: Environment
+          - VPCCIDR
+  VPCRouteTable:
+    Description: VPC route table ID
+    Value: !Ref RouteTable
+    Export:
+      Name:
+        Fn::Join:
+        - ''
+        - - Ref: Product
+          - Ref: Environment
+          - RouteTable
+
+  NatGatewayA:
+    Description: NAT Instance ID in Availability Zone A
+    Value: !Ref NatGatewayA
+    Export:
+      Name:
+        Fn::Join:
+        - ''
+        - - Ref: Product
+          - Ref: Environment
+          - NatGatewayA
+
+  NatGatewayB:
+    Description: NAT Instance ID in Availability Zone B
+    Condition: RequireHANAT
+    Value: !Ref NatGatewayB
+    Export:
+      Name:
+        Fn::Join:
+        - ''
+        - - Ref: Product
+          - Ref: Environment
+          - NatGatewayB
+
+  NatGatewayC:
+    Description: NAT Instance ID in Availability Zone C
+    Condition: RequireHANAT
+    Value: !Ref NatGatewayC
+    Export:
+      Name:
+        Fn::Join:
+        - ''
+        - - Ref: Product
+          - Ref: Environment
+          - NatGatewayC
+
+  PublicSubnetA:
+    Description: Public Subnet in Availability Zone A
+    Value: !Ref PubSubnetA
+    Export:
+      Name:
+        Fn::Join:
+        - ''
+        - - Ref: Product
+          - Ref: Environment
+          - PubSubnetA
+  PublicSubnetB:
+    Description: Public Subnet in Availability Zone B
+    Value: !Ref PubSubnetB
+    Export:
+      Name:
+        Fn::Join:
+        - ''
+        - - Ref: Product
+          - Ref: Environment
+          - PubSubnetB
+  PublicSubnetC:
+    Description: Public Subnet in Availability Zone C
+    Value: !Ref PubSubnetC
+    Export:
+      Name:
+        Fn::Join:
+        - ''
+        - - Ref: Product
+          - Ref: Environment
+          - PubSubnetC
+
+  PrivateSubnetA:
+    Description: Private Subnet in Availability Zone A
+    Value: !Ref PrivateSubnetA
+    Export:
+      Name:
+        Fn::Join:
+        - ''
+        - - Ref: Product
+          - Ref: Environment
+          - PrivateSubnetA
+
+  PrivateSubnetB:
+    Description: Private Subnet in Availability Zone B
+    Value: !Ref PrivateSubnetB
+    Export:
+      Name:
+        Fn::Join:
+        - ''
+        - - Ref: Product
+          - Ref: Environment
+          - PrivateSubnetB
+
+  PrivateSubnetC:
+    Description: Private Subnet in Availability Zone C
+    Value: !Ref PrivateSubnetC
+    Export:
+      Name:
+        Fn::Join:
+        - ''
+        - - Ref: Product
+          - Ref: Environment
+          - PrivateSubnetC
+
+  DBSubnetA:
+    Description: DB Subnet in Availability Zone A
+    Value: !Ref DBSubnetA
+    Export:
+      Name:
+        Fn::Join:
+        - ''
+        - - Ref: Product
+          - Ref: Environment
+          - DBSubnetA
+
+  DBSubnetB:
+    Description: DB Subnet in Availability Zone B
+    Value: !Ref DBSubnetB
+    Export:
+      Name:
+        Fn::Join:
+        - ''
+        - - Ref: Product
+          - Ref: Environment
+          - DBSubnetB
+
+  DBSubnetC:
+    Description: DB Subnet in Availability Zone C
+    Value: !Ref DBSubnetC
+    Export:
+      Name:
+        Fn::Join:
+        - ''
+        - - Ref: Product
+          - Ref: Environment
+          - DBSubnetC
+
+  S3EndpointId:
+    Description: S3EndpointId value
+    Value: !Ref S3Endpoint
+    Export:
+      Name:
+        Fn::Join:
+        - ''
+        - - Ref: Product
+          - Ref: Environment
+          - S3Endpoint
+
+######################################
+#           Parameters               #
+######################################
+
+Parameters:
+  Owner:
+    Description: Owner of product
+    Type: String
+    Default: "GARNCC"
+  Product:
+    Description: Name of owning product
+    Type: String
+    Default: "DEMO"
+  Environment:
+    Description: Name of Environment
+    Type: String
+    Default: "dev"
+  CidrPrefix:
+    Description: CIDR Range for this Product and Environment
+    Type: String
+    Default: "10.0"
+  HANATGateways:
+    Description: Flag to indicate if we want 3 NAT Gateways, one in each  AZs
+    Type: String
+    Default: "False"
+
+######################################
+#           Conditions               #
+######################################
+
+Conditions:
+  RequireHANAT: !Equals [!Ref HANATGateways, "True" ]
+  SingleNAT: !Equals [!Ref HANATGateways, "False" ]
+
+######################################
+#           Resources                #
+######################################
+Resources:
+######################################
+#           VPC                      #
+######################################
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      CidrBlock:
+        Fn::Join:
+          - '.'
+          - - Ref: CidrPrefix
+            - 0.0/16
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+          - ' - '
+          - - Ref: Product
+            - Ref: Environment
+            - VPC
+
+  InternetGateway:
+    Type: "AWS::EC2::InternetGateway"
+    Properties:
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+          - ' - '
+          - - Ref: Product
+            - Ref: Environment
+            - InternetGateway
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId:
+        Ref: VPC
+      InternetGatewayId:
+        Ref: InternetGateway
+
+######################################
+#           Routes                   #
+######################################
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+          - ' - '
+          - - Ref: Product
+            - Ref: Environment
+            - Internal and Public Egress Routes
+      VpcId:
+        Ref: VPC
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId:
+        Ref: RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: InternetGateway
+
+######################################
+#           Public Subnets           #
+######################################
+
+####### Public Subnet A #######
+  PubSubnetA:
+    Type: AWS::EC2::Subnet
+    DependsOn: VPC
+    Properties:
+      AvailabilityZone:
+        !Select
+          - 0
+          - Fn::GetAZs: !Ref 'AWS::Region'
+      CidrBlock:
+        !Join
+          - '.'
+          - - Ref: CidrPrefix
+            - 0.0/20
+      Tags:
+      - Key: Name
+        Value:
+          !Join
+            - ': '
+            - - Ref: Product
+              - Ref: Environment
+              - Public-A
+      VpcId:
+        Ref: VPC
+
+  PubSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: RouteTable
+      SubnetId:
+        Ref: PubSubnetA
+
+####### Public Subnet B #######
+  PubSubnetB:
+    Type: AWS::EC2::Subnet
+    DependsOn: VPC
+    Properties:
+      AvailabilityZone:
+        !Select
+          - 1
+          - Fn::GetAZs: !Ref 'AWS::Region'
+      CidrBlock:
+        !Join
+          - '.'
+          - - Ref: CidrPrefix
+            - 64.0/20
+      Tags:
+      - Key: Name
+        Value:
+          !Join
+            - ': '
+            - - Ref: Product
+              - Ref: Environment
+              - Public-B
+      VpcId:
+        Ref: VPC
+
+  PubSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: RouteTable
+      SubnetId:
+        Ref: PubSubnetB
+
+####### Public Subnet C #######
+  PubSubnetC:
+    Type: AWS::EC2::Subnet
+    DependsOn: VPC
+    Properties:
+      AvailabilityZone:
+        !Select
+          - 2
+          - Fn::GetAZs: !Ref 'AWS::Region'
+      CidrBlock:
+        !Join
+          - '.'
+          - - Ref: CidrPrefix
+            - 128.0/20
+      Tags:
+      - Key: Name
+        Value:
+          !Join
+            - ': '
+            - - Ref: Product
+              - Ref: Environment
+              - Public-C
+      VpcId:
+        Ref: VPC
+
+  PubSubnetCRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: RouteTable
+      SubnetId:
+        Ref: PubSubnetC
+
+
+###############################################################
+#  Configure Network (including NAT Route for Beanstalk)      #
+###############################################################
+
+####### NAT Gateway Setup #############
+  GatewayElasticAddressA:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+
+  GatewayElasticAddressB:
+    Type: AWS::EC2::EIP
+    Condition: RequireHANAT
+    Properties:
+      Domain: vpc
+
+  GatewayElasticAddressC:
+    Type: AWS::EC2::EIP
+    Condition: RequireHANAT
+    Properties:
+      Domain: vpc
+
+  NatGatewayA:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId:
+        Fn::GetAtt:
+        - GatewayElasticAddressA
+        - AllocationId
+      SubnetId:
+        Ref: PubSubnetA
+
+  NatGatewayB:
+    Type: AWS::EC2::NatGateway
+    Condition: RequireHANAT
+    Properties:
+      AllocationId:
+        Fn::GetAtt:
+        - GatewayElasticAddressB
+        - AllocationId
+      SubnetId:
+        Ref: PubSubnetB
+
+  NatGatewayC:
+    Type: AWS::EC2::NatGateway
+    Condition: RequireHANAT
+    Properties:
+      AllocationId:
+        Fn::GetAtt:
+        - GatewayElasticAddressC
+        - AllocationId
+      SubnetId:
+        Ref: PubSubnetC
+
+###############################################################
+#  Configure Shared Private Subnets with Internet NAT         #
+###############################################################
+
+####### Route Tables #############
+  PrivateRouteTableA:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+      - Key: Name
+        Value: !Join [ ' - ', [ Ref: Product, Ref: Environment, Internal and NAT Egress Routes in AvailabilityZone A ] ]
+      VpcId:
+        Ref: VPC
+
+  PrivateRouteTableB:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+      - Key: Name
+        Value: !Join [ ' - ', [ Ref: Product, Ref: Environment, Internal and NAT Egress Routes in AvailabilityZone B ] ]
+      VpcId:
+        Ref: VPC
+
+  PrivateRouteTableC:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+      - Key: Name
+        Value: !Join [ ' - ', [ Ref: Product, Ref: Environment, Internal and NAT Egress Routes in AvailabilityZone C ] ]
+      VpcId:
+        Ref: VPC
+
+####### Private Subnet A #######
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+        - 0
+        - Fn::GetAZs:
+            Ref: AWS::Region
+      CidrBlock:
+        !Join
+          - '.'
+          - - Ref: CidrPrefix
+            - 16.0/20
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+          - ': '
+          - - Ref: Product
+            - Ref: Environment
+            - Private-A
+      VpcId:
+        Ref: VPC
+
+  PrivateSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTableA
+      SubnetId:
+        Ref: PrivateSubnetA
+
+####### Private Subnet B #######
+  PrivateSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+        - 1
+        - Fn::GetAZs:
+            Ref: AWS::Region
+      CidrBlock:
+        !Join
+          - '.'
+          - - Ref: CidrPrefix
+            - 80.0/20
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+          - ': '
+          - - Ref: Product
+            - Ref: Environment
+            - Private-B
+      VpcId:
+        Ref: VPC
+
+  PrivateSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTableB
+      SubnetId:
+        Ref: PrivateSubnetB
+
+####### Private Subnet C #######
+  PrivateSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+        - 2
+        - Fn::GetAZs:
+            Ref: AWS::Region
+      CidrBlock:
+        !Join
+          - '.'
+          - - Ref: CidrPrefix
+            - 144.0/20
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+          - ': '
+          - - Ref: Product
+            - Ref: Environment
+            - Private-C
+      VpcId:
+        Ref: VPC
+
+  PrivateSubnetCRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTableC
+      SubnetId:
+        Ref: PrivateSubnetC
+
+  #####################
+  #  NAT Routes       #
+  #####################
+  PrivateNatRouteA:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTableA
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: NatGatewayA
+
+  PrivateSingleNatRouteB:
+    Type: AWS::EC2::Route
+    Condition: SingleNAT
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTableB
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: NatGatewayA
+
+  PrivateNatRouteB:
+    Type: AWS::EC2::Route
+    Condition: RequireHANAT
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTableB
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: NatGatewayB
+
+  PrivateSingleNatRouteC:
+    Type: AWS::EC2::Route
+    Condition: SingleNAT
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTableC
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: NatGatewayA
+
+  PrivateNatRouteC:
+    Type: AWS::EC2::Route
+    Condition: RequireHANAT
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTableC
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: NatGatewayC
+
+###############################################################
+#  Configure Shared Database Subnets with NO Internet         #
+###############################################################
+
+####### Route Tables #############
+  DBRouteTableA:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+      - Key: Name
+        Value: !Join [ ' - ', [ Ref: Product, Ref: Environment, DB Internal Routes in AvailabilityZone A ] ]
+      VpcId:
+        Ref: VPC
+
+  DBRouteTableB:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+      - Key: Name
+        Value: !Join [ ' - ', [ Ref: Product, Ref: Environment, DB Internal Routes in AvailabilityZone B ] ]
+      VpcId:
+        Ref: VPC
+
+  DBRouteTableC:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+      - Key: Name
+        Value: !Join [ ' - ', [ Ref: Product, Ref: Environment, DB Internal Routes in AvailabilityZone C ] ]
+      VpcId:
+        Ref: VPC
+
+####### DB Subnet A #######
+  DBSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+        - 0
+        - Fn::GetAZs:
+            Ref: AWS::Region
+      CidrBlock:
+        !Join
+          - '.'
+          - - Ref: CidrPrefix
+            - 32.0/20
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+          - ': '
+          - - Ref: Product
+            - Ref: Environment
+            - DB-A
+      VpcId:
+        Ref: VPC
+
+  DBSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: DBRouteTableA
+      SubnetId:
+        Ref: DBSubnetA
+
+####### DB Subnet B #######
+  DBSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+        - 1
+        - Fn::GetAZs:
+            Ref: AWS::Region
+      CidrBlock:
+        !Join
+          - '.'
+          - - Ref: CidrPrefix
+            - 96.0/20
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+          - ': '
+          - - Ref: Product
+            - Ref: Environment
+            - DB-B
+      VpcId:
+        Ref: VPC
+
+  DBSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: DBRouteTableB
+      SubnetId:
+        Ref: DBSubnetB
+
+####### DB Subnet C #######
+  DBSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+        - 2
+        - Fn::GetAZs:
+            Ref: AWS::Region
+      CidrBlock:
+        !Join
+          - '.'
+          - - Ref: CidrPrefix
+            - 160.0/20
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+          - ': '
+          - - Ref: Product
+            - Ref: Environment
+            - DB-C
+      VpcId:
+        Ref: VPC
+
+  DBSubnetCRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: DBRouteTableC
+      SubnetId:
+        Ref: DBSubnetC
+
+
+######################################
+#      Next Private Subnets         #
+######################################
+
+#start at x.x.48.0/20 (AZ-A)
+#start at x.x.112.0/20 (AZ-A)
+#start at x.x.176.0/20 (AZ-A)
+
+######################################
+#      Default Security Group        #
+######################################
+
+  DefaultSecurityGroupEgress:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      IpProtocol: -1
+      CidrIp: 127.0.0.1/32
+      GroupId:
+        Fn::GetAtt:
+        - VPC
+        - DefaultSecurityGroup
+
+############### VPC EndPoints #######################
+
+  S3Endpoint:
+      Type: 'AWS::EC2::VPCEndpoint'
+      Properties:
+          PolicyDocument:
+              Version: 2012-10-17
+              Statement:
+              - Effect: Allow
+                Principal: '*'
+                Action:
+                - s3:GetObject
+                - s3:PutObject*
+                - s3:DeleteObject*
+                - s3:ListBucket*
+                - s3:GetBucketLocation
+                - s3:GetEncryptionConfiguration
+                - s3:AbortMultipartUpload
+                - s3:ListMultipartUploadParts
+                - s3:ListBucketMultipartUploads
+                Resource:
+                - 'arn:aws:s3:::*'
+          RouteTableIds:
+          - !Ref PrivateRouteTableA
+          - !Ref PrivateRouteTableB
+          - !Ref PrivateRouteTableC
+          ServiceName: !Sub "com.amazonaws.${AWS::Region}.s3"
+          VpcId: !Ref VPC
+
+############### VPC FLOW LOG #######################
+  VPCFlowLog:
+    Type: AWS::EC2::FlowLog
+    Properties:
+      DeliverLogsPermissionArn:
+        Fn::GetAtt:
+        - FlowLogRole
+        - Arn
+      LogGroupName: FlowLogsGroup
+      ResourceId:
+        Ref: VPC
+      ResourceType: VPC
+      TrafficType: ALL
+
+  FlowLogRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "ec2.amazonaws.com"
+                - "vpc-flow-logs.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+      Policies:
+        -
+          PolicyName:
+            !Join
+              - ''
+              - - Ref: Product
+                - Ref: Environment
+                - VPCFlowLogPolicy
+          PolicyDocument:
+            Statement:
+            - Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:DescribeLogGroups
+              - logs:DescribeLogStreams
+              - logs:PutLogEvents
+              Effect: Allow
+              Resource: "*"

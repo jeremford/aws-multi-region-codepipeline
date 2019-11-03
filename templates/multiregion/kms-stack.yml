@@ -1,0 +1,55 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: S3 bucket for Artifact storage
+Outputs:
+  KeyId:
+    Description: ID of KMS Key
+    Value: !Ref EncryptionKey
+
+  KeyArn:
+    Description: Full ARN of KMS Key
+    Value: !Sub
+      - "arn:aws:kms:${AWS::Region}:${AWS::AccountId}:key/${EncryptionKeyId}"
+      - { EncryptionKeyId: !Ref EncryptionKey }
+
+Parameters:
+  Product:
+    Description: Product suite
+    Type: String
+  Environment:
+    Description: KMS environment
+    Type: String
+  KeyAliasName:
+    Description: Alias to be associated with the key
+    Type: String
+
+Resources:
+
+  EncryptionKey:
+    Type: AWS::KMS::Key
+    DeletionPolicy: Retain
+    Properties:
+      EnableKeyRotation: true
+      KeyPolicy:
+        Id:
+          Fn::Join:
+            - ''
+            - - Ref: Product
+              - Ref: Environment
+              - '-key'
+        Version: '2012-10-17'
+        Statement:
+        - Sid: Enable IAM User Permissions
+          Effect: Allow
+          Principal:
+            AWS:
+            - !Sub "arn:aws:iam::${AWS::AccountId}:root"
+          Action:
+            - kms:*
+          Resource: "*"
+  KeyAlias:
+    Type: AWS::KMS::Alias
+    DeletionPolicy: Retain
+    Properties:
+      AliasName: !Ref KeyAliasName
+      TargetKeyId:
+        Ref: EncryptionKey

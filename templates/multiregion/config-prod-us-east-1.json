@@ -1,0 +1,8 @@
+{
+  "Parameters" : {
+    "TemplatePath": "TEMPLATE_PATH_PLACEHOLDER",
+    "Environment": "prod",
+    "CidrPrefix": "10.131",
+    "PrimaryRegion": "ap-southeast-2"
+  }
+}
