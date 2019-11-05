@@ -72,10 +72,6 @@ Resources:
             Status: Enabled
             NoncurrentVersionExpirationInDays: 30
 
-  # ArtifactBucket:
-  #   Type: AWS::S3::Bucket
-  #   DeletionPolicy: Retain
-
   CodePipelineRole:
     Type: "AWS::IAM::Role"
     Properties:

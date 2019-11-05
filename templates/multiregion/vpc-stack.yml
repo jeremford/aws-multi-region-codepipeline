@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Three Tier VPC Network following AWS Best Practices
+Description: Three Tier VPC Network
 
 ######################################
 #           Outputs                  #

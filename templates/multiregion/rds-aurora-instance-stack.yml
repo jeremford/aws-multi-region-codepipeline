@@ -15,7 +15,7 @@ Parameters:
     Type: String
     Default: "dev"
   DBClass:
-    AllowedValues:
+    AllowedValues:  #just to limit me doing something stupid
     - db.t2.small
     - db.t2.medium
     - db.r4.large

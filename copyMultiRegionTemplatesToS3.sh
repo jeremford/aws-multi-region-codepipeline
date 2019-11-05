@@ -3,12 +3,10 @@
 PRIMARY_REGION=ap-southeast-2
 SECONDARY_REGION=us-east-1
 
-PROD_APPROVAL_EMAIL=jez@garn.cc
+PROD_APPROVAL_EMAIL=your@email.here
 
 mkdir -p build
 zip -j build/multi-region-templates.zip templates/multiregion/*
-
-AwsAccount=$(aws sts get-caller-identity --output text --query 'Account' --region "${PRIMARY_REGION}")
 
 printf "\nLooking up Multi Region Pipeline Bucket in $PRIMARY_REGION\n"
 
