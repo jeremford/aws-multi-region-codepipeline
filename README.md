@@ -37,6 +37,8 @@ My proposed solution was to consist of the following:
 * Aurora MySQL Regional Cluster in Primary Region with Cluster Replica in Secondary Region
 * All deployments through CodePipeline
 
+![Multi Region Setup](docs/images/MultiRegionCodePipelineAurora.png)
+
 ## Prerequisites
 
 In a typical single region AWS CodePipeline, you need to specify one 'ArtifactStore':
