@@ -6,7 +6,7 @@
 
 ## TL;DR
 
-Use AWS CodePipeline to deploy CloudFormation templates to both the Primary and Secondary Region.
+Use AWS CodePipeline to deploy CloudFormation templates to both the Primary and secondary region.
 
 ## My Solution
 
@@ -25,16 +25,16 @@ Reading through the [AWS documentation on cross region Aurora Cluster replicatio
 
 ![No so automated](docs/images/cross_region_options.png)
 
-I knew that AWS CodePipeline supported Cross Region deployments with CloudFormation, but exactly how to use this with Aurora was something I'd done before.
+I knew that AWS CodePipeline supported Cross Region deployments with CloudFormation, but exactly how to use this with Aurora was something I'd not done before.
 
 ## Intended Solution
 
 My proposed solution was to consist of the following:
 
-* Deployment into one Primary (ap-southeast-2) and at one Secondary region (us-east-1)
+* Deployment into one primary region (ap-southeast-2) and at one secondary region (us-east-1)
 * Demonstrate cross-region S3 bucket replication
 * Use Nested Stacks
-* Aurora MySQL Regional Cluster in Primary Region with Cluster Replica in Secondary Region
+* Aurora MySQL Regional Cluster in primary region with Cluster Replica in secondary region
 * All deployments through CodePipeline
 
 ![Multi Region Setup](docs/images/MultiRegionCodePipelineAurora.png)
@@ -75,14 +75,14 @@ DeployPipeline:
 
 Wanting to keep with the 'automate everything' plan, I deployed an AWS CodePipeline in each region that would then deploy the necessary prerequisites using nested CloudFormation stacks.
 
-This [pre-req-pipeline.yml](pipelines/pre-req-pipeline.yml) was deployed in both Primary and Secondary regions.
+This [pre-req-pipeline.yml](pipelines/pre-req-pipeline.yml) was deployed in both primary and secondary regions.
 
 Note: these pipelines use S3 as a Source/trigger, but it could just as easily be AWS CodeCommit.
 
 The [deployPreReqPipelines.sh](deployPreReqPipelines.sh) script will automate the deployment of these two pipelines.
 
 ```bash
-#Deploy Prerequisites Pipeline in Primary Region
+#Deploy Prerequisites Pipeline in primary region
 aws cloudformation deploy \
   --region $PRIMARY_REGION \
   --template-file pipelines/pre-req-pipeline.yml \
@@ -91,7 +91,7 @@ aws cloudformation deploy \
   --parameter-overrides SourceS3Key=prereq-templates.zip PRODApprovalEmail=$PROD_APPROVAL_EMAIL \
   --tags Environment=PROD Purpose="Multi Region CodePipeline Prerequisites"
 
-#Deploy Prerequisites Pipeline in Secondary Region
+#Deploy Prerequisites Pipeline in secondary region
 aws cloudformation deploy \
   --region $SECONDARY_REGION \
   --template-file pipelines/pre-req-pipeline.yml \
@@ -122,9 +122,9 @@ Here's an overview of what the pipeline will need:
 3. Build: Verify and upload child stacks to S3
 4. (not included) Non-Prod Deploy: deploy to single region
 5. Prod Deployment:
-  * Deploy any Prerequisites in Secondary Region
-  * Deploy Master stack in Primary Region
-  * Deploy Master stack in Secondary Region
+  * Deploy any Prerequisites in secondary region
+  * Deploy Master stack in primary region
+  * Deploy Master stack in secondary region
 
 This pipeline template is: [here](pipelines/multi-region-pipeline.yml)
 
@@ -140,13 +140,13 @@ PROD_APPROVAL_EMAIL=your@email.here
 
 printf "\nDeploying Multi Region Pipeline in $PRIMARY_REGION\n"
 
-#Lookup Prerequisites S3 Bucket in Primary Region
+#Lookup Prerequisites S3 Bucket in primary region
 PrimaryPrereqS3Bucket=$(aws cloudformation describe-stacks --region ${PRIMARY_REGION} --stack-name MULTI-REGION-PIPELINE-PREREQ | jq -r '.Stacks[0].Outputs[0].OutputValue' )
 
-#Lookup Prerequisites S3 Bucket in Secondary Region
+#Lookup Prerequisites S3 Bucket in secondary region
 SecondaryPrereqS3Bucket=$(aws cloudformation describe-stacks --region ${SECONDARY_REGION} --stack-name MULTI-REGION-PIPELINE-PREREQ | jq -r '.Stacks[0].Outputs[0].OutputValue' )
 
-#Deploy main multi region pipeline in Primary Region
+#Deploy main multi region pipeline in primary region
 aws cloudformation deploy \
   --region $PRIMARY_REGION \
   --template-file pipelines/multi-region-pipeline.yml \
@@ -167,10 +167,10 @@ aws cloudformation deploy \
 I wanted the following as part of my solution:
 
 1. VPC in each Region (I used one of my standard 3-tier 3 AZ [VPC templates](templates/multiregion/vpc-stack.yml))
-2. [S3 bucket in Primary Region](templates/multiregion/s3-stack.yml) with cross region replication to another [S3 bucket](templates/multiregion/s3-replicant-stack.yml) in the Secondary Region
+2. [S3 bucket in primary region](templates/multiregion/s3-stack.yml) with cross region replication to another [S3 bucket](templates/multiregion/s3-replicant-stack.yml) in the secondary region
 3. [KMS key](templates/multiregion/kms-stack.yml) in each Region
-4. Aurora MySQL Cluster with 1 writer in the Primary Region
-5. Aurora MySQL Replica Cluster with 1 writing in the Secondary Region
+4. Aurora MySQL Cluster with 1 writer in the primary region
+5. Aurora MySQL Replica Cluster with 1 writing in the secondary region
 
 A few notes on Aurora cross region replication:
 1. If the Source has StorageEncrypted=true, then you MUST specify the KMS Key Id in the Target
@@ -179,7 +179,7 @@ A few notes on Aurora cross region replication:
 
 ### Master Stacks
 
-With S3 cross region replication, I needed the target bucket to be created in the Secondary Region before I created the source bucket in the Primary Region.
+With S3 cross region replication, I needed the target bucket to be created in the secondary region before I created the source bucket in the primary region.
 
 This was done with the [master-stack-predeploy-us-east-1.yml][templates/multiregion/master-stack-predeploy-us-east-1.yml] stack.  This creates the S3 Bucket and has the Bucket Name as an Output of the master stack.
 
@@ -191,7 +191,7 @@ Outputs:
       Fn::GetAtt: ReplicantS3Stack.Outputs.S3BucketId
 ```
 
-The CodePipeline will then take the output of this stack, and pass it as an InputArtifact to the main stack in the Primary Region.
+The CodePipeline will then take the output of this stack, and pass it as an InputArtifact to the main stack in the primary region.
 
 Register the Output in the Pre Deploy ('OutputFileName' and 'OutputArtifacts'):
 
@@ -249,11 +249,11 @@ Consume ('InputArtifacts' and 'ParameterOverrides') in the main stack:
 ```
 
 
-The main stack in the Primary Region is: [master-stack.yml](templates/multiregion/master-stack.yml)
+The main stack in the primary region is: [master-stack.yml](templates/multiregion/master-stack.yml)
 
 It uses the 'ReplicantBucket' to register the cross region replication.
 
-The Output has the Aurora Cluster Identifier to use as the Replication Source in the Secondary Region.
+The Output has the Aurora Cluster Identifier to use as the Replication Source in the secondary region.
 
 ```yaml
 Outputs:
@@ -275,7 +275,7 @@ ParameterOverrides: |
 
 ### Aurora Cluster Template
 
-The same CloudFormation template was used for both the Primary and Secondary regions.
+The same CloudFormation template was used for both the primary and secondary regions.
 
 The use of Conditions and If allows the correct values to be set.
 
@@ -305,7 +305,7 @@ These scripts are NOT production ready!
 
 Some considerations when cleaning up (aka deleting the CloudFormation parent stacks) these resources:
 1. You can't delete an Aurora Replica while it's still replicating. You will need to promote it first, then delete it.
-2. With the mutli region CodePipeline, delete the entire Secondary Region before deleting the Primary Region stacks.
+2. With the mutli region CodePipeline, delete the entire secondary region before deleting the primary region stacks.
 
 ## The Pipelines
 
@@ -320,7 +320,7 @@ Some considerations when cleaning up (aka deleting the CloudFormation parent sta
 
 <img src="docs/images/multiregion-pipeline-build.png" alt="Source and Build phases" width="400"/>
 
-<img src="docs/images/multiregion-pipeline-secondary-predeploy.png" alt="Secondary Region Pre-Deploy phase" width="400"/>
+<img src="docs/images/multiregion-pipeline-secondary-predeploy.png" alt="secondary region Pre-Deploy phase" width="400"/>
 
 <img src="docs/images/multiregion-pipeline-deploy.png" alt="Deploy phase" width="400"/>
 
